@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <http:listener-config name="realtime-project-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="realtime-project-config" api="resource::53f64359-3913-4a29-82e5-68bafdc5986a:realtime-project:2.0.0:raml:zip:realtime-project.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+	<email:smtp-config name="Email_SMTP" doc:name="Email SMTP" doc:id="934911b3-f343-44eb-9ccd-011ed7e2d5e5" tracking:enable-default-events="false">
+		<email:smtp-connection host="smtp.gmail.com" port="587" user="pvtbank7@gmail.com" password="mmqjruupcrjynxmc" >
+			<email:properties >
+				<email:property key="mail.smtp.starttls.enable" value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="7e8df9e6-1c4a-410e-b8f5-f0d059de5fcd" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="1432" database="vivek" />
+	</db:config>
+	<flow name="realtime-project-main">
+        <http:listener config-ref="realtime-project-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="realtime-project-config" />
+    </flow>
+	<flow name="put:\unblock:application\json:realtime-project-config">
+        <ee:transform doc:name="Transform Message" doc:id="872fa770-e2e6-4257-bb61-d680806a5425">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+ payload]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="inpData" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+        </ee:transform>
+		<db:select doc:name="Select" doc:id="c9427c94-1861-4897-80fa-f90d0d4c8fa5" config-ref="Database_Config">
+			<db:sql><![CDATA[SELECT * FROM vivek.bank_transactions WHERE custAccNum=:custAccNum ]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	custAccNum:payload.accountNum
+	
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="3435724e-17ca-4ecc-a294-703b3112cf73" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="opData" ><![CDATA[%dw 2.0
+output application/json
+---
+payload reduce ((item, accumulator) ->
+item )]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="00598836-f8f7-482f-acb0-c713793d074f" name="unlock-implimentationFlow"/>
+    </flow>
+    <flow name="post:\checkBalance:application\json:realtime-project-config">
+        <ee:transform doc:name="Transform Message">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="name" ><![CDATA[%dw 2.0
+output application/java
+---
+attributes.queryParams.bank]]></ee:set-variable>
+				<ee:set-variable variableName="bankType" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.accType]]></ee:set-variable>
+				<ee:set-variable variableName="inputPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="flow" ><![CDATA[%dw 2.0
+output application/json
+---
+flow.name]]></ee:set-variable>
+			</ee:variables>
+        </ee:transform>
+		<db:select doc:name="Select" doc:id="e956dfb8-0d68-452c-944e-ab1cf86aa140" config-ref="Database_Config">
+			<db:sql><![CDATA[SELECT * FROM vivek.bank_transactions WHERE custAccNum=:custAccNum ]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+  custAccNum:payload.accountNum	
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="a3d60014-c14b-4d03-a350-9faed21dfd78" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload reduce ((item, accumulator) ->
+item )]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Data" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="ee0607c2-13c8-40b9-bfe1-d95711474eae" name="CommanCode-checkBalence&amp;withdrawFlow"/>
+    </flow>
+    <flow name="post:\createAccount:application\json:realtime-project-config">
+		<ee:transform doc:name="Transform Message" doc:id="dd3f717a-1c8e-415e-b8ed-20d6efd489ee" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="bankType" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.accType]]></ee:set-variable>
+				<ee:set-variable variableName="bank" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.bank]]></ee:set-variable>
+				<ee:set-variable variableName="name" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.customerName]]></ee:set-variable>
+				<ee:set-variable variableName="branch" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.branchName]]></ee:set-variable>
+				<ee:set-variable variableName="inputPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<db:select doc:name="Select" doc:id="e255ddf3-4652-4554-8b1d-faba95777a9e" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM vivek.bank_transactions WHERE custAccNum=:custAccNum AND bankName=:bankName;]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	custAccNum: vars.inputPayload.accountNum,
+	bankName:vars.bank
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="c0c579eb-2294-4141-bf2b-1edbaace37f3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="mail" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload.mailId]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="d6e97156-b17d-4fa8-ba85-8d2c7e460527" >
+			<when expression="#[sizeOf(payload) == 0]" >
+				<ee:transform doc:name="Transform Message" doc:id="d20fd7ce-c680-48ba-938e-7b33bcba3884" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	branchName: vars.branch,
+	bankName: vars.bank,
+	custName: vars.name,
+	accountType: vars.bankType,
+	atmPin: vars.inputPayload.atmPin,
+	totalBalance:0.00,
+	accountType: vars.bankType,
+	custAccNum: vars.inputPayload.accountNum,
+	phoneNumber: vars.inputPayload.number,
+	mailId: vars.inputPayload.mailId,
+	ifscCode: vars.inputPayload.ifscCode,
+	transactionTimeStamp: now() as DateTime,
+	wrongPin: 0,
+	accountStatus: "Active"
+	
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<db:insert doc:name="Insert" doc:id="911446b3-8e38-4655-8a54-cb01d5e04b48" config-ref="Database_Config">
+					<db:sql ><![CDATA[INSERT INTO vivek.bank_transactions (custName, custAccNum, atmPin, bankName, accountType, ifscCode, branchName, totalBalance, transactionTimeStamp, accountStatus, wrongPin, mailId, phoneNumber)
+VALUES(:custName, :custAccNum, :atmPin, :bankName, :accountType, :ifscCode, :branchName, :totalBalance, :transactionTimeStamp, :accountStatus, :wrongPin, :mailId, :phoneNumber)]]></db:sql>
+					<db:input-parameters ><![CDATA[#[payload]]]></db:input-parameters>
+				</db:insert>
+				<ee:transform doc:name="Transform Message" doc:id="107b10a1-38b2-4df3-8685-f8106cacd23e">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output text/plain
+---
+"Dear Customer...." ++
+"\nCongratulations! You have successfully created account with\n\nYour account holder name:" ++ (vars.name default "") ++
+"\nAccountNumber:" ++ (vars.inputPayload.accountNum default "") ++
+"\nBank:" ++ (vars.bank default "") ++
+"\nBranch:" ++ (vars.branch default "")]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<email:send doc:name="Send" doc:id="5bba2d5a-becb-4e56-82f9-19dfd74d5dbe" config-ref="Email_SMTP" fromAddress="pvtbank7@gmail.com" subject='#["account created"]'>
+					<email:to-addresses >
+						<email:to-address value="#[vars.mail]" />
+					</email:to-addresses>
+				</email:send>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="ef0dc27f-4276-43ce-a6dc-13fc6a5fd417" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Account " ++ vars.inputPayload.accountNum ++ " already exists"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+    </flow>
+    <flow name="post:\withDraw:application\json:realtime-project-config">
+        <ee:transform doc:name="Transform Message">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+            </ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="InputPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+        </ee:transform>
+		<db:select doc:name="Select" doc:id="bec56bb7-a256-4192-868b-a05c64bf7c77" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM vivek.bank_transactions WHERE custAccNum=:custAccNum ]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+  custAccNum:payload.accountNum	
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="e3dbc1c0-55d1-4ac7-b05c-1042cae1a7e6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload reduce ((item, accumulator) ->
+item )]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="Data" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="c7f46118-4353-40ce-8462-92ba24f3e5df" name="CommanCode-checkBalence&amp;withdrawFlow"/>
+    </flow>
+</mule>

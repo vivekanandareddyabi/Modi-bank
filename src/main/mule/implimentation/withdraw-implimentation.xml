@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="withdraw-implimentationSub_Flow" doc:id="2acef81a-9252-42f3-81ca-31067e4ac325" >
+		<choice doc:name="Choice" doc:id="f05787c1-3825-46e3-89b5-6c2623ab12e7" >
+			<when expression="#[payload.totalBalance &lt;= vars.inputPayload.amountToBeWithdraw]">
+				<db:update doc:name="Update" doc:id="ba62ccfe-cf1d-41d5-b6a0-f745a7caefaa" config-ref="Database_Config">
+					<db:sql ><![CDATA[UPDATE vivek.bank_transactions SET totalBalance=:totalBalance WHERE custAccNum=:custAccNum]]></db:sql>
+					<db:input-parameters ><![CDATA[#[{
+	custAccNum:vars.inputPayload.accountNum,
+	totalBalance:vars.Bal.totalBalance[0] - vars.inputPayload.amountToBeWithdraw 
+}]]]></db:input-parameters>
+				</db:update>
+				<ee:transform doc:name="Transform Message" doc:id="7327c446-e592-492e-bdf2-0cb8d45cfae5" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+ "status :" ++  " Amount "  ++  vars.inputPayload.amountToBeWithdraw ++ " amountToBeWithdraw "]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="85251fba-cabe-4695-b67f-477faec0bb19" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"insufficient Balance"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</sub-flow>
+</mule>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+	<flow name="CommanCode-checkBalence&amp;withdrawFlow" doc:id="9739d070-9e85-481b-b80c-72e5d71d3ce6" >
+	
+		<choice doc:name="Choice" doc:id="04c4de57-d2bf-4578-be38-83f254702e61" >
+			<when expression="#[sizeOf(payload) &gt; 0]" >
+				<choice doc:name="Choice" doc:id="0e7fd1eb-cf9d-4d87-8a9f-703618bab65d" >
+					<when expression='#[payload.accountStatus == "Active"]' >
+						<choice doc:name="Choice" doc:id="cc37f677-1fdd-4955-b032-a267a1a81784" >
+							<when expression="#[payload.atmPin == vars.inputPayload.atmPin]">
+								<choice doc:name="Choice" doc:id="27a94371-eb93-4ed1-90c0-2f172141ebf8" >
+									<when expression='#[vars.flow == "post:\\checkBalance:application\\json:realtime-project-config"]'>
+										<flow-ref doc:name="Flow Reference" doc:id="86e39b38-1b91-4e26-9663-336671c205a1" name="checkBalance-implimentationSub_Flow"/>
+									</when>
+									<otherwise>
+										<flow-ref doc:name="Flow Reference" doc:id="e554dc22-6a83-4c0c-b92e-6310d5a23e7b" name="withdraw-implimentationSub_Flow"/>
+									</otherwise>
+								</choice>
+							</when>
+							<otherwise >
+								<set-variable value="#[vars.Data.wrongPin[0]  + 1]" doc:name="Set Variable" doc:id="20c35887-666e-4c6f-9c03-4e72fad0d97d" variableName="WrongPin" />
+								<choice doc:name="Choice" doc:id="442c4f3e-00e9-4315-978a-4b986392281a" >
+									<when expression="#[vars.WrongPin &gt; 3]" >
+										<db:update doc:name="Update" doc:id="a1629a0c-51e0-495e-9e54-3556506c9694" config-ref="Database_Config" >
+											<db:sql ><![CDATA[UPDATE vivek.bank_transactions SET accountStatus=:stat WHERE custAccNum=:custAccNum]]></db:sql>
+											<db:input-parameters ><![CDATA[#[{
+	stat:"Blocked",
+	custAccNum:vars.inputPayload.accountNum
+}]]]></db:input-parameters>
+										</db:update>
+										<ee:transform doc:name="Transform Message" doc:id="da4014a5-7d1b-4bae-8b99-c4c1d6c0fe01" >
+											<ee:message >
+												<ee:set-payload ><![CDATA[%dw 2.0
+output text/plain
+---
+"Your account with account number: " ++ vars.inputPayload.accountNum[0] ++ "has blocked, please do visit nearest branch " ]]></ee:set-payload>
+											</ee:message>
+										</ee:transform>
+										<email:send doc:name="Send" doc:id="ab0b7154-150c-4171-a1b2-e4a09d4d6158" config-ref="Email_SMTP" fromAddress="pvtbank7@gmail.com" >
+											<email:to-addresses >
+												<email:to-address value="#[vars.Data.mailId[0]]" />
+											</email:to-addresses>
+										</email:send>
+									</when>
+									<otherwise >
+										<db:update doc:name="Update" doc:id="6b53806e-8aaa-4935-bc6e-601ec3da4970" config-ref="Database_Config" >
+											<db:sql ><![CDATA[UPDATE vivek.bank_transactions SET wrongPin=:attempts WHERE custAccNum=:custAccNum]]></db:sql>
+											<db:input-parameters ><![CDATA[#[{
+	attempts:vars.WrongPin,
+	custAccNum:vars.inputPayload.accountNum
+}]]]></db:input-parameters>
+										</db:update>
+										<ee:transform doc:name="Transform Message" doc:id="931c4fb5-0bd0-45ea-8758-5c413ae39620" >
+											<ee:message >
+												<ee:set-payload ><![CDATA[%dw 2.0
+output text/plain
+---
+"You've entered a wrong pin, remaining attempts: " ++ (3 - vars.Data.wrongPin[0])]]></ee:set-payload>
+											</ee:message>
+										</ee:transform>
+										<email:send doc:name="Send" doc:id="f30c7d41-3498-4971-9eaf-ae96fd028674" config-ref="Email_SMTP" fromAddress="pvtbank7@gmail.com" >
+											<email:to-addresses >
+												<email:to-address value="#[vars.Data.mailId[0]]" />
+											</email:to-addresses>
+										</email:send>
+									</otherwise>
+								</choice>
+							</otherwise>
+						</choice>
+					</when>
+					<otherwise >
+						<ee:transform doc:name="Transform Message" doc:id="11e2fe69-6915-4174-ad66-1b4368d464ef" >
+							<ee:message >
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Account number: " ++ vars.Data.custAccNum[0] ++ "temporarily blocked. Please visit nearest Branch” "]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="Transform Message" doc:id="e06aba09-0b50-446c-817b-3dfcff0d02a9" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+ "Acc num doesn't exist "]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>

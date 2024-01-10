@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_9739d070_9e85_481b_b80c_72e5d71d3ce6_Input_Variables_Data = Array<{|  pk: Number,   custName: String,   custAccNum: String,   atmPin: String,   bankName: String,   accountType: String,   ifscCode: String,   branchName: String,   totalBalance: Number,   transactionTimeStamp: String,   accountStatus: String,   wrongPin?: Number,   mailId: String,   phoneNumber: String|}>
+

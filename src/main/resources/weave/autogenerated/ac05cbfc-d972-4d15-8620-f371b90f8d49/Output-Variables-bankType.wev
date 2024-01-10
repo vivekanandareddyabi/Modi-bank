@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_ac05cbfc_d972_4d15_8620_f371b90f8d49_Output_Variables_bankType = "current" | "savings"
+

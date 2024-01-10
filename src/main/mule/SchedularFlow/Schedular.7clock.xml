@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd">
+	<flow name="Schedular.7clockFlow" doc:id="01f13e03-ba66-48f4-9726-76323e5e386a" >
+		<scheduler doc:name="Scheduler" doc:id="3508ee94-33a6-408c-96e0-e05814bdceba" >
+			<scheduling-strategy >
+				<cron expression="0 0/5 * 1/1 * ? *" timeZone="IST" />
+			</scheduling-strategy>
+		</scheduler>
+		<db:select doc:name="Select" doc:id="35d16952-fb56-42b8-a6ce-8e4158ca4afe" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT  mailId,totalBalance FROM vivek.bank_transactions ]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="4bd1517c-8c3f-4fc6-86a5-237e53ded728" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<try doc:name="Try" doc:id="7c3ea75e-57a7-4e30-a5df-0b2019399921" >
+			<foreach doc:name="For Each" doc:id="57ee2daf-695f-4dbe-a91e-09e74c388d72" >
+				<set-variable value='#[payload.mailId]' doc:name="Set Variable" doc:id="d72434f0-bdcb-40bb-abe5-9f01ee9433a0" variableName="mail"/>
+				<ee:transform doc:name="Transform Message" doc:id="bf9e5577-50a1-4de3-9e79-dfff25aed464" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output text/plain
+---
+" your total Balance in your bank "  ++ payload.totalBalance]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<email:send doc:name="Send" doc:id="7112299e-4f79-4ea8-90f4-dd1226b4ecea" config-ref="Email_SMTP" fromAddress="pvtbank7@gmail.com" subject='#["transaction alert  "]'>
+					<email:to-addresses >
+						<email:to-address value="#[vars.mail]" />
+					</email:to-addresses>
+				</email:send>
+			</foreach>
+		</try>
+	</flow>
+</mule>
